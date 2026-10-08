@@ -61,7 +61,7 @@ Copyright (C) 2026 Madmen3733.
   - GDI (рисование поверх окна).
 - **Прямая эмиссия машинного кода x86-64**.
 - **Система методов** по Microsoft x64 ABI: `RCX/RDX/R8/R9` + `XMM0–XMM3`,
-  раздельные счётчики int/float, forward references для рекурсии,
+  счётчики int/float, forward references для рекурсии,
   корректное выравнивание `RSP`, varargs.
 - **Массивы MBPRBF** — смешанные/однородные, статические/динамические.
 - **Структуры WinAPI** на `ctypes` с релокацией RVA-полей.
@@ -272,28 +272,28 @@ with ctx.try_():
 
 ## Модули
 
-| Файл                 | Назначение                                               |
-|----------------------|----------------------------------------------------------|
-| `asm_helper.py`      | эмиттеры инструкций, `call_iat`, `call_rva`, ветвления   |
-| `methods.py`         | ABI, прологи/эпилоги, `start_method` / `call_method`     |
-| `contexts.py`        | `Context`, `GUIContext`, `ConsoleContext`, `GDIContext`  |
-| `console_builder.py` | сборка `.exe` для CUI                                    |
-| `gui_builder.py`     | сборка `.exe` для GUI + `.rsrc`                          |
-| `gdi_builder.py`     | надстройка над GUI для GDI                               |
-| `widgets.py`         | виджеты, `Window`, `Timer`                               |
-| `gdi_objects.py`     | фигуры, `rgb`, вращение                                  |
-| `structs.py`         | WinAPI-структуры                                         |
-| `data.py`            | `.data`: `DATA_ALLOC`, строки, структуры                 |
-| `mb_array.py`        | ядро массивов                                            |
-| `arrays.py`          | регистрация, init, get/set/len/free                      |
-| `array_runtime.py`   | append / insert / remove / resize                        |
-| `array_validator.py` | валидация и трекинг                                      |
-| `memory_tracker.py`  | трекер аллокаций                                         |
-| `seh.py`             | `.pdata` / `.xdata`, `UnwindInfo`, scope-таблицы         |
-| `runtime_guard.py`   | VEH-guard и `__C_specific_handler` wrapper               |
-| `pe_builder.py`      | PE-заголовок, секции, `.rsrc`, `.reloc`                  |
-| `imports.py`         | `IMPORT_DLL`, `CORE_IMPORTS`, `CONSOLE_CORE_IMPORTS`     |
-| `consts.py`          | WinAPI-константы                                         |
+| Файл                 | Назначение                                              |
+|----------------------|---------------------------------------------------------|
+| `asm_helper.py`      | эмиттеры инструкций, `call_iat`, `call_rva`, ветвления  |
+| `methods.py`         | ABI, прологи/эпилоги, `start_method` / `call_method`    |
+| `contexts.py`        | `Context`, `GUIContext`, `ConsoleContext`, `GDIContext` |
+| `console_builder.py` | сборка `.exe` для CUI                                   |
+| `gui_builder.py`     | сборка `.exe` для GUI + `.rsrc`                         |
+| `gdi_builder.py`     | надстройка над GUI для GDI                              |
+| `widgets.py`         | виджеты, `Window`, `Timer`                              |
+| `gdi_objects.py`     | фигуры, `rgb`, вращение                                 |
+| `structs.py`         | WinAPI-структуры                                        |
+| `data.py`            | `.data`: `DATA_ALLOC`, строки, структуры                |
+| `mb_array.py`        | ядро массивов                                           |
+| `arrays.py`          | регистрация, init, get/set/len/free                     |
+| `array_runtime.py`   | append / insert / remove / resize                       |
+| `array_validator.py` | валидация и трекинг                                     |
+| `memory_tracker.py`  | трекер аллокаций                                        |
+| `seh.py`             | `.pdata` / `.xdata`, `UnwindInfo`, scope-таблицы        |
+| `runtime_guard.py`   | SEH-guard и `__C_specific_handler` wrapper              |
+| `pe_builder.py`      | PE-заголовок, секции, `.rsrc`, `.reloc`                 |
+| `imports.py`         | `IMPORT_DLL`, `CORE_IMPORTS`, `CONSOLE_CORE_IMPORTS`    |
+| `consts.py`          | WinAPI-константы                                        |
 
 ## Ограничения
 
