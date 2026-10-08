@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mbprbf"
+version = "1.0.0"
+description = "Madmen Builder for Programs on Raw Bytes Framework — Python toolchain for generating native Windows x64 PE executables without MSVC, NASM, linker, or CRT"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Madmen3733", email = "t2520572@gmail.com"},
+]
+keywords = [
+    "pe", "x64", "windows", "toolchain", "compiler", "linker",
+    "assembler", "codegen", "seh", "ffi", "gdi", "gui",
+    "no-msvc", "no-nasm", "no-crt", "raw-bytes",
+    "pe-builder", "winapi", "x86-64", "machine-code",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Assembly",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Code Generators",
+]
+
+[project.urls]
+Homepage = "https://github.com/madmenbuilder/mbprbf"
+Repository = "https://github.com/madmenbuilder/mbprbf"
+Issues = "https://github.com/madmenbuilder/mbprbf/issues"
+Changelog = "https://github.com/madmenbuilder/mbprbf/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+gui = ["Pillow>=10.0"]
+dev = ["pytest>=7.0", "build>=1.0", "twine>=4.0"]
+
+[tool.setuptools]
+packages = ["mbprbf"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
