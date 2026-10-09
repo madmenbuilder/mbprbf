@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mbprbf"
-version = "1.0.6"
+version = "1.0.7"
 description = "Madmen Builder for Programs on Raw Bytes Framework — Python toolchain for generating native Windows x64 PE executables without MSVC, NASM, linker, or CRT"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -30,6 +30,9 @@ classifiers = [
     "Topic :: Software Development :: Compilers",
     "Topic :: Software Development :: Code Generators",
 ]
+dependencies = [
+    "Pillow>=10.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/madmenmadmen/mbprbf"
@@ -38,9 +41,7 @@ Issues = "https://github.com/madmenmadmen/mbprbf/issues"
 Changelog = "https://github.com/madmenmadmen/mbprbf/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-gui = ["Pillow>=10.0"]
 dev = ["pytest>=7.0", "build>=1.0", "twine>=4.0"]
-
 [tool.setuptools]
 packages = ["mbprbf"]
 
