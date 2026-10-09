@@ -1898,6 +1898,54 @@ class ConsoleContext(Context):
         self.read_line(buf_rva, size)
         self.write_counted(buf_rva)
 
+    def write_ptr(self, ptr_rva, size, handle_rva=None):
+        """WriteFile(handle, *(char**)ptr_rva, size, &written, NULL)."""
+        if handle_rva is None:
+            handle_rva = self.stdout_rva
+        self.mov_reg_rva(1, handle_rva)  # rcx = handle
+        self.mov_reg_rva(2, ptr_rva)  # rdx = *(char**)ptr_rva
+        self.emit(bytes([0x41, 0xB8]) + struct.pack("<I", size & 0xFFFFFFFF))  # r8d = size
+        if self.written_rva:
+            self.lea_rip(9, self.written_rva)
+        else:
+            self.emit(bytes([0x4C, 0x8D, 0x4C, 0x24, 0x30]))
+        self.emit(bytes([0x48, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00, 0x00, 0x00]))
+        self.call_iat("WriteFile")
+
+    def write_ptr_var(self, ptr_rva, size_rva, handle_rva=None):
+        """WriteFile(handle, *(char**)ptr_rva, *(int*)size_rva, &written, NULL)."""
+        if handle_rva is None:
+            handle_rva = self.stdout_rva
+        self.mov_reg_rva(1, handle_rva)  # rcx = handle
+        self.mov_reg_rva(2, ptr_rva)  # rdx = *(char**)ptr_rva
+        self.mov_r8d_rva(size_rva)  # r8d = *(int*)size_rva
+        if self.written_rva:
+            self.lea_rip(9, self.written_rva)
+        else:
+            self.emit(bytes([0x4C, 0x8D, 0x4C, 0x24, 0x30]))
+        self.emit(bytes([0x48, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00, 0x00, 0x00]))
+        self.call_iat("WriteFile")
+
+    def write_int_ptr(self, ptr_rva, handle_rva=None):
+        """wsprintfA(buf, "%d", *(int*)ptr_rva) + WriteFile."""
+        if handle_rva is None:
+            handle_rva = self.stdout_rva
+        self.lea_rip(1, self.buf_rva)  # rcx = buf
+        self.lea_rip(2, self.string_rvas["_fmt_d"])  # rdx = "%d"
+        self.mov_reg_rva(8, ptr_rva)  # r8d = *(int*)ptr_rva
+        self.emit(bytes([0x31, 0xC0]))  # xor eax, eax
+        self.call_iat("wsprintfA")
+        # eax = длина
+        self.store_eax_rva(self.scratch_rva)
+        # WriteFile(stdout, buf, len, ...)
+        self.mov_reg_rva(1, handle_rva)
+        self.lea_rip(2, self.buf_rva)
+        self.mov_r8d_rva(self.scratch_rva)
+        if self.written_rva:
+            self.lea_rip(9, self.written_rva)
+        self.emit(bytes([0x48, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00, 0x00, 0x00]))
+        self.call_iat("WriteFile")
+
     def exit(self, code=0):
         self.emit(bytes([0xB9]) + struct.pack("<I", code & 0xFFFFFFFF))
         self.call_iat("ExitProcess")

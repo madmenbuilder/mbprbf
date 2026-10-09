@@ -149,9 +149,16 @@ class Array:
             self.offsets.append(cur)
             cur += s
         cur = align_up(cur, max_align)
-        self.capacity = cur
-        self.used_bytes = cur
-        self.offsets_capacity = self.length
+        if self.length == 0:
+            # Пустой массив: нет элементов — нет занятых байт.
+            self.offsets = []
+            self.capacity = 0
+            self.used_bytes = 0
+            self.offsets_capacity = 0
+        else:
+            self.capacity = cur
+            self.used_bytes = cur
+            self.offsets_capacity = self.length
 
         if self.is_homogeneous:
             self.elem_size = code_to_size(self.type_codes[0]) if self.type_codes else 0

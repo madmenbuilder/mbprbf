@@ -979,8 +979,7 @@ def _value_to_bits(value, code):
         return struct.unpack("<Q", struct.pack("<d", float(value)))[0]
     if code == T_CHAR_P:
         if isinstance(value, Rva):
-            from .pe_builder import IMAGE_BASE
-            return (IMAGE_BASE + value.rva) & 0xFFFFFFFFFFFFFFFF
+            return value
         if isinstance(value, str):
             raise ValueError(
                 "array: для c_char_p передавайте Rva(string_rva) — "

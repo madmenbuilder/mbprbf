@@ -231,12 +231,12 @@ def _build_console_text(text_rva, iat, data_rva, text_buf_off,
 
     main(ctx)
 
-    from .runtime_guard import gen_runtime_guard
-    csh_rva_wrapper = gen_runtime_guard(ctx)
-
     code.extend(bytes([0x31, 0xC9]))
     call_iat("ExitProcess")
     code.extend(bytes([0xCC]))
+
+    from .runtime_guard import gen_runtime_guard
+    csh_rva_wrapper = gen_runtime_guard(ctx)
 
     return bytes(code), csh_rva_wrapper
 

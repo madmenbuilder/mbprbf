@@ -87,7 +87,9 @@ def register_array(name, values=None, types=None, size=None):
             types = [type_of_value(v) for v in values]
         else:
             types = list(types)
-            if len(types) == 1 and len(values) > 1:
+            if not values:
+                pass
+            elif len(types) == 1 and len(values) > 1:
                 types = types * len(values)
             elif len(types) != len(values):
                 raise ValueError(
@@ -220,7 +222,7 @@ def array_get(ctx, arr, index):
     check_bounds_static(arr, index, "array_get")
     slot_rva = ctx.rva_of(arr.name)
 
-    if isinstance(index, int):
+    if isinstance(index, int) and arr.is_static:
         _emit_load_const(ctx, arr, slot_rva, index)
     else:
         _emit_load_var(ctx, arr, slot_rva, index)
@@ -430,6 +432,13 @@ def _load_charp_to_rdx(ctx, value, arr=None, idx=None):
     Если value — имя строки из add_string — берём ctx.string_rvas[value].
     Если value — str и arr/idx заданы — берём arr.str_keys[idx].
     """
+    if isinstance(value, str) and arr is not None and idx is not None:
+        if idx in arr.str_keys:
+            key = arr.str_keys[idx]
+            rva = ctx.string_rvas[key]
+            ctx.emit(bytes([0x48, 0x8D, 0x15])
+                     + ctx.i32(rva - (ctx.rva_now() + 7)))
+            return
     if isinstance(value, str):
         rva = ctx.string_rvas[value]
         ctx.emit(bytes([0x48, 0x8D, 0x15])
