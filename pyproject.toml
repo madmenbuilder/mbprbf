@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mbprbf"
-version = "1.0.7"
+version = "1.0.8"
 description = "Madmen Builder for Programs on Raw Bytes Framework — Python toolchain for generating native Windows x64 PE executables without MSVC, NASM, linker, or CRT"
 readme = "README.md"
 requires-python = ">=3.12"
