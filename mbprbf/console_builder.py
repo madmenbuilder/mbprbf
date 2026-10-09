@@ -66,6 +66,57 @@ def _ensure_service_slots(data_alloc, data_order):
                                 "init": 0, "type": "int"}
             data_order.append(name)
 
+def _ensure_service_strings(strings):
+    """Добавить базовые строки, нужные консольному приложению.
+
+    Регистрирует ТОЛЬКО:
+      - переводы строк / пробелы
+      - форматы printf для wsprintfA
+      - разделители
+
+    Готовые фразы (_press_enter, _done, _ok, _error и т.д.)
+    пользователь добавляет сам через add_string.
+
+    Не перезаписывает уже добавленные пользователем строки.
+    """
+    base = {
+        # --- Переводы строк / пробелы ---
+        "_crlf":   "\r\n",
+        "_lf":     "\n",
+        "_cr":     "\r",
+        "_tab":    "\t",
+        "_space":  " ",
+        "_empty":  "",
+        "_nul":    "\x00",
+
+        # --- Форматы printf (для wsprintfA) ---
+        "_fmt_d":   "%d",
+        "_fmt_u":   "%u",
+        "_fmt_x":   "%x",
+        "_fmt_X":   "%X",
+        "_fmt_s":   "%s",
+        "_fmt_c":   "%c",
+        "_fmt_p":   "%p",
+        "_fmt_ld":  "%ld",
+        "_fmt_lu":  "%lu",
+        "_fmt_lld": "%lld",
+        "_fmt_llu": "%llu",
+        "_fmt_zu":  "%zu",
+        "_fmt_f":   "%f",
+        "_fmt_lf":  "%lf",
+        "_fmt_g":   "%g",
+        "_fmt_e":   "%e",
+
+        # --- Разделители ---
+        "_eq":    "=",
+        "_colon": ": ",
+        "_comma": ", ",
+        "_dash":  " - ",
+    }
+    for name, value in base.items():
+        if name not in strings:
+            strings[name] = value
+
 def _layout_console_data(data_alloc, data_order):
     """Раскладка .data для консольного приложения.
 
@@ -213,6 +264,7 @@ def build_console(out_path, main,
     if extra_strings is None: extra_strings = {}
 
     _ensure_service_slots(data_alloc, data_order)
+    _ensure_service_strings(strings)
     if "_heap" not in data_alloc:
         data_alloc["_heap"] = {"off": None, "size": 8,
                                "init": 0, "type": "int"}

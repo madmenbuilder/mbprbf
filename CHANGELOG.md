@@ -1,4 +1,3 @@
-cat > CHANGELOG.md << 'EOF'
 # Changelog
 
 All notable changes to MBPRBF are documented here.
@@ -23,10 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GroupBox, ListBox, ComboBox, ProgressBar, TrackBar, Timer.
 - GDI — Rect, Square, Circle, Ellipse, Polygon, Line, Text, Image.
 - Console / GUI / GDI builders.
-
-### Records
-
-- `hello.exe` — 3584 bytes, no `.reloc`, `DYNAMIC_BASE` on.
 
 ### License
 

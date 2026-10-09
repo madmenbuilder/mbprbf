@@ -73,6 +73,12 @@ def build_gdi(out_path, windows, widgets, shapes, timers,
         _data.add_string("_face_Arial", "Arial")
     if "_dyn_text_len" not in data_alloc:
         _data.data_alloc("_dyn_text_len", 4, 0)
+    if "_rot_k" not in data_alloc:
+        data_alloc("_rot_k", 4, init=f2i(3.14159265 / 180.0), type="float")
+    if "_rot_cos" not in data_alloc:
+        data_alloc("_rot_cos", 4, init=f2i(1.0), type="float")
+    if "_rot_sin" not in data_alloc:
+        data_alloc("_rot_sin", 4, init=f2i(0.0), type="float")
 
     for s in shapes:
         txt = getattr(s, "text", None)
