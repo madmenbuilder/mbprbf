@@ -57,6 +57,10 @@ def _png_to_dib_blob(source, w=None, h=None, shape=None):
 
     return bytes(buf)
 
+def f2i(v):
+    """float32 → uint32 биты (для data_alloc с type='float')."""
+    return struct.unpack("<I", struct.pack("<f", v))[0]
+
 def build_gdi(out_path, windows, widgets, shapes, timers,
               data_alloc=None, data_order=None, strings=None,
               imports=None, extra_strings=None,
