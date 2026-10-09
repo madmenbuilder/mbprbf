@@ -45,13 +45,13 @@ Copyright (C) 2026 Madmen3733.
 
 ## Author
 
-**Madmen3733** — [github.com/madmenbuilder](https://github.com/madmenbuilder)
+**Madmen3733** — [github.com/madmenmadmen](https://github.com/madmenmadmen)
 
 ## Links
 
-- **GitHub**: https://github.com/madmenbuilder/mbprbf
+- **GitHub**: https://github.com/madmenmadmen/mbprbf
 - **PyPI**: https://pypi.org/project/mbprbf/
-- **Issues**: https://github.com/madmenbuilder/mbprbf/issues
+- **Issues**: https://github.com/madmenmadmen/mbprbf/issues
 
 ## Возможности
 
