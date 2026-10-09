@@ -36,7 +36,7 @@ from .consts import (
 )
 from .data import DATA_OFF_HEAP, DATA_OFF_HINST
 from .methods import (MethodsMixin, MethodRegistry, distribute_args,
-                     Method, MethodArg, _struct_return_kind, _size_of, LocalVar, FRAME_BASE)
+                     Method, MethodArg, _struct_return_kind, _size_of, LocalVar, FRAME_BASE, Rva, Mem)
 import ctypes
 
 from .memory_tracker import (track_alloc, track_free, track_realloc)
@@ -45,6 +45,13 @@ from .seh import (
     SehBuilder, UnwindInfo, ScopeRecord, RuntimeFunction,
     EXCEPTION_EXECUTE_HANDLER, EXCEPTION_CONTINUE_SEARCH,
 )
+
+_REG_NUM = {
+    'rax': 0, 'rcx': 1, 'rdx': 2, 'rbx': 3,
+    'rsp': 4, 'rbp': 5, 'rsi': 6, 'rdi': 7,
+    'r8': 8, 'r9': 9, 'r10': 10, 'r11': 11,
+    'r12': 12, 'r13': 13, 'r14': 14, 'r15': 15,
+}
 
 class _TryCtx:
     """Контекстный менеджер для __try."""
@@ -488,6 +495,59 @@ class Context(MethodsMixin):
             bits = self._f32_bits(float(val)) & 0xFFFFFFFF
             self.emit(bytes([0xC7, 0x44, 0x24, stack_off])
                       + struct.pack("<I", bits))
+
+    def _emit_arg(self, reg, value):
+        """
+        Загрузить value в регистр reg.
+
+        reg:   'rcx' | 'rdx' | 'r8' | 'r9' (целевой регистр)
+        value: int   → mov reg, imm32
+               str   → mov reg, [rip + rva]   (имя слота в .data)
+               Rva   → lea reg, [rip + rva]
+               Mem   → mov reg, [rip + rva]
+        """
+        if isinstance(value, bool):
+            value = int(value)
+
+        if isinstance(value, int):
+            if reg == 'rcx':
+                self.emit(bytes([0xB9]) + self.i32(value))
+            elif reg == 'rdx':
+                self.emit(bytes([0xBA]) + self.i32(value))
+            elif reg == 'r8':
+                self.emit(bytes([0x41, 0xB8]) + self.i32(value))
+            elif reg == 'r9':
+                self.emit(bytes([0x41, 0xB9]) + self.i32(value))
+            else:
+                raise ValueError(f"_emit_arg: unsupported reg {reg}")
+
+        elif isinstance(value, str):
+            rva = self.rva_of(value)
+            if reg == 'rcx':
+                self.mov_ecx_rva(rva)
+            elif reg == 'rdx':
+                self.mov_edx_rva(rva)
+            elif reg == 'r8':
+                self.mov_r8d_rva(rva)
+            elif reg == 'r9':
+                self.emit(bytes([0x45, 0x8B, 0x0D])
+                          + self.i32(rva - (self.rva_now() + 7)))
+            else:
+                raise ValueError(f"_emit_arg: unsupported reg {reg}")
+
+        elif isinstance(value, Rva):
+            reg_num = _REG_NUM[reg]
+            self.lea_rip(reg_num, value.rva)
+
+        elif isinstance(value, Mem):
+            reg_num = _REG_NUM[reg]
+            self.mov_reg_rva(reg_num, value.rva)
+
+        else:
+            raise TypeError(
+                f"_emit_arg: unsupported value {value!r} "
+                f"(ожидалось int/str/Rva/Mem)"
+            )
 
     def if_mem_eq_imm(self, name, imm):
         self.mov_eax_mem(name); self.cmp_eax_imm32(imm); return self.jcc(0x84)
@@ -1377,13 +1437,17 @@ class GUIContext(Context):
         self.call_iat("SendMessageA")
 
     def set_timer(self, id_val, ms, hwnd_win=None):
+        """SetTimer(hwnd, id_val, ms, NULL).
+
+        id_val, ms: int | str | Rva | Mem
+        """
         if hwnd_win is None:
             self.mov_reg_rva(1, self._hwnd_rva())
         else:
             self.mov_reg_rva(1, self.hwnd_rva_of(hwnd_win))
-        self.emit(bytes([0xBA]) + struct.pack("<I", id_val))
-        self.emit(bytes([0x41, 0xB8]) + struct.pack("<I", ms))
-        self.emit(bytes([0x45, 0x31, 0xC9]))
+        self._emit_arg('rdx', id_val)
+        self._emit_arg('r8',  ms)
+        self.emit(bytes([0x45, 0x31, 0xC9]))  # xor r9d, r9d (NULL)
         self.call_iat("SetTimer")
 
     def kill_timer(self, id_val, hwnd_win=None):
@@ -1395,47 +1459,66 @@ class GUIContext(Context):
         self.call_iat("KillTimer")
 
     def move_window_widget(self, widget, x, y, w, h, repaint=1):
-        self.mov_reg_rva(1, self.data_rva + widget.data_off)
-        self.emit(bytes([0xBA]) + struct.pack("<I", x & 0xFFFFFFFF))
-        self.emit(bytes([0x41, 0xB8]) + struct.pack("<I", y & 0xFFFFFFFF))
-        self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", w & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x20]) + struct.pack("<I", h & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x28]) + struct.pack("<I", repaint & 0xFFFFFFFF))
-        self.call_iat("MoveWindow")
+        """MoveWindow(widget.hwnd, x, y, w, h, repaint).
 
-    def move_window_widget_rva(self, widget, x_rva, y_rva, w, h, repaint=1):
-        self.mov_reg_rva(1, self.data_rva + widget.data_off)
-        self.mov_edx_rva(x_rva)
-        self.mov_r8d_rva(y_rva)
-        self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", w & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x20]) + struct.pack("<I", h & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x28]) + struct.pack("<I", repaint & 0xFFFFFFFF))
+        x, y, w, h: int | str (имя слота) | Rva | Mem
+        repaint:    int
+        """
+        self.mov_reg_rva(1, self.data_rva + widget.data_off)  # rcx = hwnd
+        self._emit_arg('rdx', x)                              # rdx = x
+        self._emit_arg('r8',  y)                              # r8  = y
+        self._emit_arg('r9',  w)                              # r9  = w
+
+        # [rsp+0x20] = h
+        if isinstance(h, int) and not isinstance(h, bool):
+            self.emit(bytes([0xC7, 0x44, 0x24, 0x20]) + self.i32(h))
+        elif isinstance(h, str):
+            self.mov_eax_rva(self.rva_of(h))
+            self.emit(bytes([0x89, 0x44, 0x24, 0x20]))
+        elif isinstance(h, Rva):
+            self.mov_eax_rva(h.rva)
+            self.emit(bytes([0x89, 0x44, 0x24, 0x20]))
+        elif isinstance(h, Mem):
+            self.mov_eax_rva(h.rva)
+            self.emit(bytes([0x89, 0x44, 0x24, 0x20]))
+        else:
+            raise TypeError(f"move_window_widget: h: {h!r}")
+
+        # [rsp+0x28] = repaint
+        self.emit(bytes([0xC7, 0x44, 0x24, 0x28]) + self.i32(repaint))
         self.call_iat("MoveWindow")
 
     def move_window(self, win, x, y, w, h, repaint=1):
+        """MoveWindow(win.hwnd, x, y, w, h, repaint)."""
         self.mov_reg_rva(1, self.hwnd_rva_of(win))
-        self.emit(bytes([0xBA]) + struct.pack("<I", x & 0xFFFFFFFF))
-        self.emit(bytes([0x41, 0xB8]) + struct.pack("<I", y & 0xFFFFFFFF))
-        self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", w & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x20]) + struct.pack("<I", h & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x28]) + struct.pack("<I", repaint & 0xFFFFFFFF))
-        self.call_iat("MoveWindow")
+        self._emit_arg('rdx', x)
+        self._emit_arg('r8', y)
+        self._emit_arg('r9', w)
 
-    def move_window_rva(self, win, x_rva, y_rva, w, h, repaint=1):
-        self.mov_reg_rva(1, self.hwnd_rva_of(win))
-        self.mov_edx_rva(x_rva)
-        self.mov_r8d_rva(y_rva)
-        self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", w & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x20]) + struct.pack("<I", h & 0xFFFFFFFF))
-        self.emit(bytes([0xC7, 0x44, 0x24, 0x28]) + struct.pack("<I", repaint & 0xFFFFFFFF))
+        if isinstance(h, int) and not isinstance(h, bool):
+            self.emit(bytes([0xC7, 0x44, 0x24, 0x20]) + self.i32(h))
+        elif isinstance(h, str):
+            self.mov_eax_rva(self.rva_of(h))
+            self.emit(bytes([0x89, 0x44, 0x24, 0x20]))
+        elif isinstance(h, Rva):
+            self.mov_eax_rva(h.rva)
+            self.emit(bytes([0x89, 0x44, 0x24, 0x20]))
+        elif isinstance(h, Mem):
+            self.mov_eax_rva(h.rva)
+            self.emit(bytes([0x89, 0x44, 0x24, 0x20]))
+        else:
+            raise TypeError(f"move_window: h: {h!r}")
+
+        self.emit(bytes([0xC7, 0x44, 0x24, 0x28]) + self.i32(repaint))
         self.call_iat("MoveWindow")
 
     def move_widget(self, widget, x, y, w, h):
         self.move_window_widget(widget, x, y, w, h)
 
     def show_window(self, win, show=SW_SHOW):
+        """ShowWindow(win.hwnd, show)."""
         self.mov_reg_rva(1, self.hwnd_rva_of(win))
-        self.emit(bytes([0xBA]) + struct.pack("<I", show & 0xFFFFFFFF))
+        self._emit_arg('rdx', show)
         self.call_iat("ShowWindow")
 
     def destroy_window(self, win):
@@ -1443,8 +1526,14 @@ class GUIContext(Context):
         self.call_iat("DestroyWindow")
 
     def enable_window(self, win, enable=True):
+        """EnableWindow(win.hwnd, enable).
+
+        enable: bool | int | str | Rva | Mem
+        """
         self.mov_reg_rva(1, self.hwnd_rva_of(win))
-        self.emit(bytes([0xBA]) + struct.pack("<I", 1 if enable else 0))
+        if isinstance(enable, bool):
+            enable = 1 if enable else 0
+        self._emit_arg('rdx', enable)
         self.call_iat("EnableWindow")
 
     def set_window_title_rva(self, win, str_rva):
@@ -1527,10 +1616,10 @@ class GUIContext(Context):
         self.sub_eax_imm32(win.h)
         self.shr_eax_1()
         self.store_eax_rva(self.rva_of("_center_y"))
-        self.move_window_rva(win,
-                             self.rva_of("_center_x"),
-                             self.rva_of("_center_y"),
-                             win.w, win.h)
+        self.move_window(win,
+                         Mem(self.rva_of("_center_x")),
+                         Mem(self.rva_of("_center_y")),
+                         win.w, win.h)
 
     def get_client_size(self, rect_name, out_w_rva, out_h_rva):
         self.get_client_rect(rect_name)
@@ -1663,17 +1752,19 @@ class GUIContext(Context):
         self.call_iat("SendMessageA")
 
     def progressbar_set_pos(self, widget, pos):
+        """SendMessage(widget.hwnd, PBM_SETPOS, pos, 0)."""
         self.mov_reg_rva(1, self.data_rva + widget.data_off)
-        self.emit(bytes([0xBA]) + struct.pack("<I", PBM_SETPOS))
-        self.emit(bytes([0x41, 0xB8]) + struct.pack("<I", pos & 0xFFFFFFFF))
+        self._emit_arg('rdx', PBM_SETPOS)
+        self._emit_arg('r8',  pos)
         self.emit(bytes([0x45, 0x31, 0xC9]))
         self.call_iat("SendMessageA")
 
     def progressbar_set_range(self, widget, low, high):
+        """SendMessage(widget.hwnd, PBM_SETRANGE32, low, high)."""
         self.mov_reg_rva(1, self.data_rva + widget.data_off)
-        self.emit(bytes([0xBA]) + struct.pack("<I", PBM_SETRANGE32))
-        self.emit(bytes([0x41, 0xB8]) + struct.pack("<I", low & 0xFFFFFFFF))
-        self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", high & 0xFFFFFFFF))
+        self._emit_arg('rdx', PBM_SETRANGE32)
+        self._emit_arg('r8',  low)
+        self._emit_arg('r9',  high)
         self.call_iat("SendMessageA")
 
     def progressbar_get_pos(self, widget):
@@ -1684,6 +1775,8 @@ class GUIContext(Context):
         self.call_iat("SendMessageA")
 
     def trackbar_set_range(self, widget, low, high):
+        """SendMessage(widget.hwnd, TBM_SETRANGE, TRUE, MAKELPARAM(low, high)).
+        """
         self.mov_reg_rva(1, self.data_rva + widget.data_off)
         self.emit(bytes([0xBA]) + struct.pack("<I", TBM_SETRANGE))
         self.emit(bytes([0x41, 0xB8, 0x01, 0x00, 0x00, 0x00]))
@@ -1691,11 +1784,27 @@ class GUIContext(Context):
         self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", lparam))
         self.call_iat("SendMessageA")
 
+    def trackbar_set_range_rva(self, widget, low_rva, high_rva):
+        """SendMessage(widget.hwnd, TBM_SETRANGE, TRUE,
+                       MAKELPARAM(*low_rva, *high_rva))."""
+        self.mov_reg_rva(1, self.data_rva + widget.data_off)
+        self.emit(bytes([0xBA]) + struct.pack("<I", TBM_SETRANGE))
+        self.emit(bytes([0x41, 0xB8, 0x01, 0x00, 0x00, 0x00]))
+        # low → eax, high → ecx, собрать lparam = (high << 16) | low
+        self.mov_eax_rva(low_rva)
+        self.emit(bytes([0x0F, 0xB7, 0xC0]))          # movzx eax, ax
+        self.mov_ecx_rva(high_rva)
+        self.emit(bytes([0xC1, 0xE1, 0x10]))          # shl ecx, 16
+        self.emit(bytes([0x09, 0xC1]))                # or ecx, eax
+        self.emit(bytes([0x41, 0x89, 0xC9]))          # mov r9d, ecx
+        self.call_iat("SendMessageA")
+
     def trackbar_set_pos(self, widget, pos):
+        """SendMessage(widget.hwnd, TBM_SETPOS, TRUE, pos)."""
         self.mov_reg_rva(1, self.data_rva + widget.data_off)
         self.emit(bytes([0xBA]) + struct.pack("<I", TBM_SETPOS))
         self.emit(bytes([0x41, 0xB8, 0x01, 0x00, 0x00, 0x00]))
-        self.emit(bytes([0x41, 0xB9]) + struct.pack("<I", pos & 0xFFFFFFFF))
+        self._emit_arg('r9', pos)
         self.call_iat("SendMessageA")
 
     def trackbar_get_pos(self, widget):
