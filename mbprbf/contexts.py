@@ -965,30 +965,28 @@ class Context(MethodsMixin):
     def va_start(self, ap_name, n_fixed=0):
         ap_rva = self.rva_of(ap_name)
 
+        # reg_save_int = rbp + 0x10
         self.emit(bytes([0x48, 0x8D, 0x45, 0x10]))
+        self.emit(bytes([0x48, 0x89, 0x05]) + struct.pack("<i", ap_rva + 0x00 - (self.rva_now() + 7)))
 
-        self.emit(bytes([0x48, 0x89, 0x05])
-                  + struct.pack("<i", ap_rva + 0x00 - (self.rva_now() + 7)))
-
-        # reg_save_float = rbp + 0x10
-        self.emit(bytes([0x48, 0x89, 0x05])
-                  + struct.pack("<i", ap_rva + 0x08 - (self.rva_now() + 7)))
+        # reg_save_float = rbp + 0x10 + n_fixed*8
+        off = 0x10 + n_fixed * 8
+        if off <= 0x7F:
+            self.emit(bytes([0x48, 0x8D, 0x45, off]))
+        else:
+            self.emit(bytes([0x48, 0x8D, 0x85]) + struct.pack("<i", off))
+        self.emit(bytes([0x48, 0x89, 0x05]) + struct.pack("<i", ap_rva + 0x08 - (self.rva_now() + 7)))
 
         # stack_ptr = rbp + 0x30
         self.emit(bytes([0x48, 0x8D, 0x45, 0x30]))
-
-        self.emit(bytes([0x48, 0x89, 0x05])
-                  + struct.pack("<i", ap_rva + 0x10 - (self.rva_now() + 7)))
+        self.emit(bytes([0x48, 0x89, 0x05]) + struct.pack("<i", ap_rva + 0x10 - (self.rva_now() + 7)))
 
         # int_count = n_fixed
-        self.emit(bytes([0xC7, 0x05])
-                  + struct.pack("<i", ap_rva + 0x18 - (self.rva_now() + 10))
-                  + struct.pack("<I", n_fixed))
+        self.emit(
+            bytes([0xC7, 0x05]) + struct.pack("<i", ap_rva + 0x18 - (self.rva_now() + 10)) + struct.pack("<I", n_fixed))
 
         # float_count = 0
-        self.emit(bytes([0xC7, 0x05])
-                  + struct.pack("<i", ap_rva + 0x1C - (self.rva_now() + 10))
-                  + struct.pack("<I", 0))
+        self.emit(bytes([0xC7, 0x05]) + struct.pack("<i", ap_rva + 0x1C - (self.rva_now() + 10)) + struct.pack("<I", 0))
 
     def local(self, name, ctype, init=None, size=None):
         """Объявить локальную переменную.
